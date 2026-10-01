@@ -4,8 +4,6 @@ Aplicación web para estimar el capital técnico necesario (CTN), el excedente d
 
 El cálculo se realiza completamente en el navegador a partir del Salario Promedio Indexado (SPI), el saldo de la Cuenta de Capitalización Individual (CCI), los aportes voluntarios y la composición del grupo de beneficiarios. La aplicación utiliza las tablas EARDA 2009 y EMSSI 2007 mensualizadas, una tasa técnica configurable y un factor de 13 pagos por año.
 
-> **Aviso:** esta herramienta es una réplica operativa con fines de cálculo y apoyo. Sus resultados deben validarse contra la normativa, los criterios actuariales y los procedimientos oficiales vigentes antes de utilizarlos para tomar decisiones o emitir prestaciones.
-
 ## Funcionalidades
 
 - Captura la fecha de fallecimiento, el SPI, la CCI y los aportes voluntarios.
