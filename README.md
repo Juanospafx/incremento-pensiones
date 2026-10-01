@@ -76,7 +76,131 @@ El factor mensual de descuento se obtiene mediante:
 v = 1 / (1 + i)^(1/12)
 ```
 
-Las tasas anuales de mortalidad por mil se convierten en probabilidades mensuales. A partir de ellas se construyen las funciones actuariales `l`, `D` y `N` empleadas en los valores actuales necesarios unitarios (VANU).
+### Generación de las tablas de mortalidad mensuales
+
+El archivo `app.js` contiene cuatro series base de tasas anuales de mortalidad (`qₓ`) expresadas por mil:
+
+- EARDA 2009, masculino y femenino, para beneficiarios sin discapacidad;
+- EMSSI 2007, masculino y femenino, para hijos con discapacidad.
+
+Por cada sexo y tipo de tabla, `buildTablaMensual()` genera las columnas mensuales `l`, `D` y `N`. El procedimiento implementado es el siguiente:
+
+1. **Define el horizonte.** EARDA se extiende hasta 110 años (`1,320` meses) y EMSSI hasta 101 años (`1,212` meses).
+2. **Inicializa la población.** Se parte de `l₀ = 10,000,000` sobrevivientes.
+3. **Selecciona la tasa anual.** Para el mes `t`, la edad anual usada como índice es `floor(t / 12)`. La misma tasa anual se aplica a los doce meses de esa edad.
+4. **Convierte la tasa por mil.** El dato de la tabla se divide entre `1,000` para obtener `q_anual`. Si no existe una tasa para la edad solicitada, el código usa `1,000‰` como valor terminal.
+5. **Mensualiza la mortalidad.** Se supone una distribución compuesta uniforme de la supervivencia dentro del año:
+
+   ```text
+   q_mensual = 1 − (1 − min(0.999999, q_anual))^(1/12)
+   ```
+
+   El límite `0.999999` impide usar una mortalidad mensual derivada de una probabilidad anual exactamente igual a uno y conserva una supervivencia residual en el punto terminal.
+
+6. **Proyecta sobrevivientes.** Para cada mes:
+
+   ```text
+   l[t + 1] = l[t] · (1 − q_mensual)
+   ```
+
+7. **Calcula la columna de conmutación `D`.** Con el factor mensual de descuento `v`:
+
+   ```text
+   D[t] = redondear(l[t] · v^t, 2)
+   ```
+
+8. **Calcula la columna acumulada `N`.** Se inicia con `N[maxMeses + 1] = 0` y se acumula desde el último mes hacia el primero:
+
+   ```text
+   N[t] = redondear(N[t + 1] + D[t], 2)
+   ```
+
+El factor `v` se redondea a 14 decimales; `D` y cada acumulación de `N`, a 2 decimales. Las tablas se reconstruyen completamente cuando cambia la tasa técnica.
+
+### Cálculo de edades y plazos
+
+Todas las edades se calculan en meses enteros cumplidos a la fecha de fallecimiento:
+
+```text
+edad_meses = (año_evento − año_nacimiento) · 12
+             + (mes_evento − mes_nacimiento)
+```
+
+Si el día del fallecimiento es anterior al día de nacimiento, se resta un mes. Las edades se truncan y limitan al rango disponible en la tabla actuarial antes de consultar `D` y `N`.
+
+Para un hijo sin discapacidad se calcula el plazo restante hasta los 21 años:
+
+```text
+z = 252 − edad_meses
+```
+
+La interpolación por fracción de mes usa:
+
+```text
+f = (día_nacimiento − día_fallecimiento) / 30
+    + (día_nacimiento <= día_fallecimiento ? 1 : 0)
+```
+
+### Cálculo del VANU
+
+Los valores actuales necesarios unitarios incorporan el factor `13/12` para representar trece pagos anuales:
+
+```text
+VANU temporario del cónyuge:
+ayn13(y, n) = (13/12) · (N[y + 1] − N[y + n + 1]) / D[y]
+
+VANU vitalicio EARDA:
+ay13(y) = (13/12) · N[y + 1] / D[y]
+
+VANU vitalicio EMSSI:
+ay13Disc(y) = (13/12) · N_EMSSI[y + 1] / D_EMSSI[y]
+```
+
+Para hijos sin discapacidad, el extremo de la renta temporaria se interpola:
+
+```text
+fin = h + z
+N_fin = N[fin] + f · (N[fin + 1] − N[fin])
+ahz13(h, z, f) = (13/12) · (N[h + 1] − N_fin) / D[h]
+```
+
+Cada VANU se redondea a 6 decimales. Si `D` no es positivo, la función devuelve cero para evitar una división inválida.
+
+## Reglas del negocio
+
+El cálculo sigue estas reglas en el orden indicado:
+
+1. Debe existir al menos un beneficiario: cónyuge, uno o más hijos, o ambos.
+2. La participación `b` se asigna automáticamente según la composición familiar; el usuario no puede editarla.
+3. La edad y el sexo determinan la tabla, el plazo y el VANU aplicables a cada beneficiario.
+4. La renta normal individual es el 60 % del SPI multiplicado por la participación del beneficiario.
+5. El CTN individual es la renta normal multiplicada por el VANU. El CTN total es la suma de los CTN individuales.
+6. Solo existe incremento cuando el capital disponible para incremento es mayor que cero y el VANU del beneficiario es positivo.
+7. La nueva renta tiene como piso la renta normal; el código nunca permite que el resultado quede por debajo de ella.
+8. El total mostrado como **Renta nueva total** es la suma de las nuevas rentas individuales, no un nuevo reparto independiente.
+
+### Selección de tabla y modalidad
+
+| Beneficiario | Condición | Tabla | Modalidad y plazo |
+| --- | --- | --- | --- |
+| Cónyuge | Edad `<= 600` meses | EARDA según sexo | Temporaria, 60 meses |
+| Cónyuge | Edad `> 600` y `<= 660` meses | EARDA según sexo | Temporaria, 72 meses |
+| Cónyuge | Edad `> 660` meses | EARDA según sexo | Vitalicia |
+| Hijo | Sin discapacidad y edad `< 252` meses | EARDA según sexo | Temporaria hasta los 21 años |
+| Hijo | Sin discapacidad y edad `>= 252` meses | No aplica | VANU, CTN y renta base iguales a cero |
+| Hijo | Con discapacidad | EMSSI según sexo | Vitalicia |
+
+### Tratamiento de la CCI y los aportes voluntarios
+
+El capital usado para generar incrementos se determina con estas condiciones:
+
+| Condición | Capital disponible para incremento | Valor presentado como excedente |
+| --- | --- | --- |
+| `CCI − CTN total >= 0` | `(CCI − CTN total) + aportes` | `CCI − CTN total` |
+| `CCI − CTN total < 0` y aportes `> 0` | Solo aportes voluntarios | Aportes voluntarios |
+| `CCI − CTN total < 0` y aportes `= 0` | `0` | `0` |
+
+En el segundo caso, el déficit de la CCI no se descuenta de los aportes voluntarios: estos se destinan directamente al incremento. Esta es una regla explícita de la implementación actual. En el tercer caso, la interfaz presenta cero aunque el excedente bruto interno sea negativo.
 
 ### Distribución de la renta
 
@@ -85,15 +209,6 @@ Las tasas anuales de mortalidad por mil se convierten en probabilidades mensuale
 | Solo cónyuge | Cónyuge: 1.00 |
 | Cónyuge y N hijos | Cónyuge: 0.50; cada hijo: `0.50 / N` |
 | Solo N hijos | Cada hijo: `1.00 / N` |
-
-### Beneficiarios
-
-- **Cónyuge de hasta 600 meses de edad:** renta temporaria de 60 meses.
-- **Cónyuge mayor de 600 y hasta 660 meses:** renta temporaria de 72 meses.
-- **Cónyuge mayor de 660 meses:** renta vitalicia.
-- **Hijo sin discapacidad y menor de 21 años:** renta temporaria hasta cumplir 252 meses, calculada con EARDA 2009 e interpolación por fracción de mes.
-- **Hijo sin discapacidad de 21 años o más:** CTN y renta base iguales a cero.
-- **Hijo con discapacidad:** renta vitalicia calculada con EMSSI 2007.
 
 ### Fórmulas principales
 
