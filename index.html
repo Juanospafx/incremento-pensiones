@@ -1,0 +1,335 @@
+﻿<!doctype html>
+<html lang="es-DO">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Calculadora — Incremento de Pensión por Sobrevivencia (RD)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Montserrat:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbarInner">
+        <div class="brandRow">
+          <div class="sipenLogo" aria-label="SIPEN">
+            <!-- Logo SIPEN (SVG inline, Montserrat). "I" como check verde con punto -->
+            <svg viewBox="0 0 360 90" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SIPEN">
+              <g transform="translate(8,14)">
+                <text x="0" y="40" font-family="Montserrat, Arial, sans-serif" font-size="52" font-weight="700" fill="#003876">S</text>
+                <!-- "i" como punto + check -->
+                <circle cx="58" cy="10" r="6" fill="#00A651"></circle>
+                <path d="M44 32 L56 44 L78 18" fill="none" stroke="#00A651" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"></path>
+                <text x="88" y="40" font-family="Montserrat, Arial, sans-serif" font-size="52" font-weight="700" fill="#003876">PEN</text>
+                <text x="2" y="66" font-family="Montserrat, Arial, sans-serif" font-size="16" font-weight="600" fill="#003876">Superintendencia de Pensiones</text>
+              </g>
+            </svg>
+          </div>
+          <div class="appMeta">
+            <div class="name">Calculadora Actuarial — Incremento de Pensión por Sobrevivencia</div>
+            <div class="sub">
+              <span><strong>EARDA 2009 / EMSSI 2007</strong></span>
+              <span class="dot"></span>
+              <span>i anual <strong class="mono" id="iValTop"></strong></span>
+              <span class="dot"></span>
+              <span>v mensual <strong class="mono" id="vPillTop"></strong></span>
+              <span class="dot"></span>
+              <span>p <strong class="mono" id="pValTop"></strong></span>
+            </div>
+          </div>
+        </div>
+        <div class="topPill">
+          <span class="mono">Pagos 13/12</span>
+          <span style="opacity:.65">·</span>
+          <strong>Actuarial</strong>
+        </div>
+      </div>
+      <div class="accentLine"></div>
+    </div>
+    <div class="wrap">
+      <header>
+        <div class="title">
+          <h1>Incremento de Pensión por Sobrevivencia — Calculadora Actuarial (RD)</h1>
+          <p>
+            Replica operativa (single-file) basada en EARDA 2009 y EMSSI 2007 mensual, tasa técnica \(i\) configurable y pagos 13/12.
+            Calcula CTN por beneficiario y, si hay excedente disponible o aportes voluntarios, el incremento mensual según b y VANU.
+          </p>
+        </div>
+        <div class="pill">
+          <span>Tablas:</span> <strong>EARDA 2009 / EMSSI 2007</strong>
+          <span class="muted">·</span>
+          <span>i:</span> <strong class="mono" id="iValPill"></strong>
+          <span class="muted">·</span>
+          <span>v:</span> <strong id="vPill" class="mono"></strong>
+        </div>
+      </header>
+
+      <div class="grid">
+        <div class="card" id="formCard">
+          <h2>Insumos de cálculo</h2>
+
+          <div class="section">
+            <h3>1) Datos del afiliado</h3>
+            <div class="row">
+              <div class="field">
+                <label for="fechaFallecimiento">Fecha de fallecimiento</label>
+                <input id="fechaFallecimiento" type="date" />
+              </div>
+              <div class="field">
+                <label for="spi">SPI (Salario Promedio Indexado)</label>
+                <input id="spi" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <h3>2) Saldo Constitutivo (CCI)</h3>
+            <div class="row">
+              <div class="field">
+                <label for="cci">CCI / Saldo Constitutivo</label>
+                <input id="cci" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
+              </div>
+              <div class="field">
+                <label for="aportes">Aportes voluntarios</label>
+                <input id="aportes" type="number" inputmode="decimal" step="0.01" placeholder="0.00" />
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <h3>3) Cónyuge</h3>
+            <div class="row row-1">
+              <div class="toggle">
+                <input id="hayConyuge" type="checkbox" />
+                <label for="hayConyuge" style="margin:0;color:var(--brand);font-weight:600;font-family:Montserrat,Inter,Arial,sans-serif;text-transform:none;letter-spacing:0;">¿Hay cónyuge?</label>
+              </div>
+            </div>
+            <div id="conyugeFields" style="display:none;margin-top:10px;">
+              <div class="row">
+                <div class="field">
+                  <label for="nacConyuge">Fecha de nacimiento del cónyuge</label>
+                  <input id="nacConyuge" type="date" />
+                </div>
+                <div class="field">
+                  <label for="sexoConyuge">Sexo del cónyuge</label>
+                  <select id="sexoConyuge">
+                    <option value="F">Femenino</option>
+                    <option value="M">Masculino</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <h3>4) Hijos</h3>
+            <div class="row">
+              <div class="field">
+                <label for="cantHijos">Cantidad de hijos</label>
+                <select id="cantHijos"></select>
+              </div>
+            </div>
+            <div id="childrenList" class="childrenList"></div>
+          </div>
+
+          <div class="btnbar">
+            <button class="btn-primary" id="btnCalcular" type="button">Calcular</button>
+            <button class="btn-secondary" id="btnTecnicos" type="button">Insumos técnicos</button>
+            <button class="btn-secondary" id="btnLimpiar" type="button">Limpiar</button>
+          </div>
+
+          <div class="section" style="padding-top:0">
+            <div class="errors" id="errorsBox"></div>
+          </div>
+        </div>
+
+        <div class="card" id="resultsCard">
+          <div class="cardHead">
+            <h2>Resultados</h2>
+            <button class="btn-secondary exportBtn" id="btnExportPdf" type="button" disabled>Exportar PDF</button>
+          </div>
+          <div class="results">
+            <div class="printHeader">
+              <strong>Calculadora Actuarial — Incremento de Pensión por Sobrevivencia</strong>
+              <span>Reporte de cálculo final</span>
+              <span id="printDate"></span>
+            </div>
+            <div class="summary">
+              <div class="kpi">
+                <div class="k">CTN</div>
+                <div class="v mono" id="kpiCtn">—</div>
+              </div>
+              <div class="kpi">
+                <div class="k">CCI</div>
+                <div class="v mono" id="kpiExcT">—</div>
+              </div>
+              <div class="kpi">
+                <div class="k" id="kpiExcLabel">Excedente (CCI − CTN)</div>
+                <div class="v mono" id="kpiExc">—</div>
+              </div>
+              <div class="kpi">
+                <div class="k">Aportes voluntarios</div>
+                <div class="v mono" id="kpiApo">—</div>
+              </div>
+            </div>
+
+            <div class="footerline">
+              <div class="mini">
+                <span class="badge" id="sufBadge">—</span>
+                <span class="chip"><strong>Renta nueva total</strong>: <span class="mono" id="kpiRentaTotal">—</span></span>
+              </div>
+              <div class="mini">
+                <span class="chip"><strong>Distribución de renta</strong>: <span class="mono" id="distInfo">—</span></span>
+              </div>
+            </div>
+
+            <div class="tableWrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Beneficiario</th>
+                    <th class="right">Edad (años)</th>
+                    <th class="right th-center">Distribución de renta</th>
+                    <th class="right">Plazo (meses)</th>
+                    <th class="right th-center th-vanu">Valor Actual Necesario Unitario</th>
+                    <th class="right">CTN</th>
+                    <th class="right">Renta normal</th>
+                    <th class="right">Incremento</th>
+                    <th class="right">Nueva renta</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody">
+                  <tr>
+                    <td colspan="9" class="muted">Ingrese los datos y presione <strong>Calcular</strong>.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Insumos técnicos -->
+    <div id="techModalOverlay" class="modalOverlay" aria-hidden="true">
+      <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="techModalTitle">
+        <div class="modalHead">
+          <div>
+            <div id="techModalTitle" class="modalTitle">Insumos técnicos y otra información</div>
+            <div class="modalSub">Parámetros actuariales usados en el cálculo.</div>
+          </div>
+          <button id="btnCerrarTechModal" type="button" class="modalX" aria-label="Cerrar">✕</button>
+        </div>
+        <div class="modalBody">
+          <div class="row">
+            <div class="field">
+              <label>Parámetros técnicos</label>
+              <div class="toggle">
+                <div class="mini">
+                  <span class="chip"><strong>p</strong> = <span class="mono" id="pVal"></span></span>
+                  <span class="chip"><strong>13/12</strong> = <span class="mono">1.0833333333</span></span>
+                  <span class="chip"><strong>ω</strong> = <span class="mono">110 / 101 años</span></span>
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label>Tasa técnica y factor V</label>
+              <div class="toggle" style="justify-content:space-between;gap:12px;">
+                <span class="mono"><strong>i</strong> = <span id="iValInline" class="mono"></span></span>
+                <button id="btnEditarTasa" type="button" class="btn-secondary" style="padding:8px 12px;font-size:12px;">
+                  Cambiar tasa
+                </button>
+              </div>
+              <div class="hint">v mensual: <span class="mono" id="vMensualDisplay">—</span></div>
+            </div>
+          </div>
+          <div class="note techNote" style="margin-top:12px;">
+            <div class="techNoteTitle">Notas técnicas</div>
+            <div>
+              <strong>VANU</strong> es el factor actuarial aplicado a la renta temporaria o vitalicia para estimar el CTN. EARDA 2009 aplica a beneficiarios sin discapacidad; EMSSI 2007 aplica a hijos con discapacidad. En hijos sin discapacidad se usa ahz(13) con interpolación por f.
+              Cuando existe excedente disponible, el incremento mensual usa directamente la fracción b de cada beneficiario.
+            </div>
+            <div class="formulaGrid">
+              <div class="formulaBlock">
+                <div class="label">Aportes voluntarios</div>
+                <div class="equation">Si CCI no cubre CTN, los aportes voluntarios generan incremento directamente y se ignora el déficit.</div>
+              </div>
+              <div class="formulaBlock">
+                <div class="label">Cónyuge</div>
+                <div class="equation">Caso A: n = 60 si y <= 600, n = 72 si 600 < y <= 660. Caso B: vitalicia si y > 660.</div>
+              </div>
+              <div class="formulaBlock">
+                <div class="label">Hijos</div>
+                <div class="equation">No discapacitado: EARDA ahz(13) hasta 21 años. Discapacitado: EMSSI vitalicio.</div>
+              </div>
+            </div>
+            <div class="formulaGrid">
+              <div class="formulaBlock">
+                <div class="label">Capital técnico necesario</div>
+                <div class="equation">
+                  CTN = SPI · p · b · VANU
+                </div>
+              </div>
+              <div class="formulaBlock">
+                <div class="label">Incremento mensual</div>
+                <div class="equation">
+                  Incremento<sub>i</sub> =
+                  <span class="frac">
+                    <span>Excedente<sub>total</sub> · b<sub>i</sub></span>
+                    <span>VANU<sub>i</sub></span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modalFoot">
+          <button id="btnCerrarTechModalFoot" type="button" class="btn-secondary">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Cambiar tasa técnica -->
+    <div id="modalOverlay" class="modalOverlay" aria-hidden="true">
+      <div id="modalCard" class="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modalHead">
+          <div>
+            <div id="modalTitle" class="modalTitle">Cambiar tasa técnica anual (i)</div>
+            <div class="modalSub">Guarda para recalcular \(v\) y la tabla mensual (D/N).</div>
+          </div>
+          <button id="btnCerrarModal" type="button" class="modalX" aria-label="Cerrar">✕</button>
+        </div>
+        <div class="modalBody">
+          <div class="row">
+            <div class="field">
+              <label for="iAnualModal">Tasa técnica anual (i) — %</label>
+              <input id="iAnualModal" type="number" inputmode="decimal" min="0" step="0.01" />
+              <div class="hint">Ej.: 5.00 para 5% anual.</div>
+            </div>
+            <div class="field">
+              <label>v mensual resultante</label>
+              <div class="toggle"><span class="mono" id="vMensualModal">—</span></div>
+              <div class="hint">\(v = 1/(1+i)^{1/12}\)</div>
+            </div>
+          </div>
+          <div class="note" style="margin-top:12px;">
+            <strong>Importante.</strong> Cambiar la tasa puede modificar CTN, excedentes e incrementos.
+          </div>
+        </div>
+        <div class="modalFoot">
+          <button id="btnCancelarModal" type="button" class="btn-secondary">Cancelar</button>
+          <button id="btnGuardarTasa" type="button" class="btn-primary">Guardar tasa</button>
+        </div>
+      </div>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
+
+
+
